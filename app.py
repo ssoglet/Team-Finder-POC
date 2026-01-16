@@ -159,7 +159,7 @@ def send_message_dialog(target):
                     "시간": datetime.now().strftime("%H:%M")
                 })
                 
-                st.success(f"✅ {target['이름']}님에게 메시지를 보냈습니다!")
+                st.session_state.show_message_success = True
                 st.rerun()
             else:
                 st.error("메시지를 입력해주세요.")
@@ -185,6 +185,10 @@ if "post_form_version" not in st.session_state:
     st.session_state.post_form_version = 0
 if "comment_versions" not in st.session_state:
     st.session_state.comment_versions = {}
+if "show_post_success" not in st.session_state:
+    st.session_state.show_post_success = False
+if "show_message_success" not in st.session_state:
+    st.session_state.show_message_success = False
 
 # 헤더
 st.markdown("""
@@ -250,6 +254,11 @@ with tab1:
     st.markdown("### 📋 팀원 모집 게시판")
     st.markdown("공모전, 창업, 대외활동 팀원을 모집하는 공간입니다.")
     
+    # 게시글 등록 성공 알림 (자동 사라짐)
+    if st.session_state.show_post_success:
+        st.success("✅ 게시글이 등록되었습니다!")
+        st.session_state.show_post_success = False
+    
     if not st.session_state.students:
         st.info("👆 먼저 '더미 데이터 생성' 버튼을 클릭해주세요!")
     else:
@@ -303,7 +312,7 @@ with tab1:
                         st.session_state.post_expander_open = False
                         # 폼 버전 증가로 입력값 초기화
                         st.session_state.post_form_version += 1
-                        st.success("게시글이 등록되었습니다!")
+                        st.session_state.show_post_success = True
                         st.rerun()
                     else:
                         st.error("제목과 내용을 모두 입력해주세요.")
@@ -381,6 +390,11 @@ with tab1:
 # ===== 탭 2: 팀원 검색 =====
 with tab2:
     st.markdown("### 🔍 팀원 검색")
+    
+    # 메시지 전송 성공 알림 (자동 사라짐)
+    if st.session_state.show_message_success:
+        st.success("✅ 메시지가 전송되었습니다!")
+        st.session_state.show_message_success = False
     
     if not st.session_state.students:
         st.info("👆 먼저 '더미 데이터 생성' 버튼을 클릭해주세요!")
@@ -566,18 +580,30 @@ with tab3:
             st.markdown("#### 채팅방 목록")
             for chat_id, chat_data in st.session_state.chats.items():
                 other_person = chat_data["상대방"]
-                last_msg = chat_data["메시지"][-1]["내용"][:25] + "..." if len(chat_data["메시지"][-1]["내용"]) > 25 else chat_data["메시지"][-1]["내용"] if chat_data["메시지"] else "새 대화"
-                
-                # 채팅방 정보: 전공 / 학년 / 이름
-                chat_info = f"{other_person['전공']} / {other_person['학년']} / {other_person['이름']}"
+                last_msg = chat_data["메시지"][-1]["내용"][:20] + "..." if len(chat_data["메시지"][-1]["내용"]) > 20 else chat_data["메시지"][-1]["내용"] if chat_data["메시지"] else "새 대화"
                 
                 is_selected = st.session_state.current_chat == chat_id
                 
-                if st.button(
-                    f"{'🔵 ' if is_selected else ''}{chat_info}\n📩 {last_msg}",
-                    key=f"select_{chat_id}",
-                    use_container_width=True
-                ):
+                # 2줄 형식: 첫줄 - 전공/학년/이름, 둘째줄 - 최근 메시지
+                st.markdown(f"""
+                <div style="
+                    background-color: {'#e3f2fd' if is_selected else '#f5f5f5'};
+                    border-radius: 8px;
+                    padding: 10px;
+                    margin-bottom: 8px;
+                    border-left: 3px solid {'#2196F3' if is_selected else '#ccc'};
+                    cursor: pointer;
+                ">
+                    <div style="font-weight: bold; margin-bottom: 4px;">
+                        {'🔵 ' if is_selected else ''}{other_person['전공']} / {other_person['학년']} / {other_person['이름']}
+                    </div>
+                    <div style="color: #666; font-size: 13px;">
+                        📩 {last_msg}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button("선택", key=f"select_{chat_id}", use_container_width=True):
                     st.session_state.current_chat = chat_id
                     st.rerun()
         
