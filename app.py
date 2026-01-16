@@ -3,6 +3,7 @@ import random
 import pandas as pd
 from datetime import datetime
 import altair as alt
+import html
 
 # 페이지 설정
 st.set_page_config(
@@ -90,6 +91,11 @@ def filter_students_advanced(students, filters, my_profile=None, apply_activity_
         if not student.get("활성화", True):
             continue
         
+        # 본인 제외 (이름과 전공으로 비교)
+        if my_profile:
+            if student.get("이름") == my_profile.get("이름") and student.get("전공") == my_profile.get("전공"):
+                continue
+        
         # 기본 필터: 내 희망 활동과 겹치는지 확인
         if apply_activity_filter and my_profile:
             my_activities = set(my_profile.get("희망 활동 리스트", []))
@@ -175,6 +181,10 @@ if "current_chat" not in st.session_state:
     st.session_state.current_chat = None
 if "post_expander_open" not in st.session_state:
     st.session_state.post_expander_open = False
+if "post_form_version" not in st.session_state:
+    st.session_state.post_form_version = 0
+if "comment_versions" not in st.session_state:
+    st.session_state.comment_versions = {}
 
 # 헤더
 st.markdown("""
@@ -248,12 +258,13 @@ with tab1:
             if not st.session_state.my_profile:
                 st.warning("게시글을 작성하려면 먼저 '본인 등록' 탭에서 프로필을 등록해주세요.")
             else:
-                post_title = st.text_input("제목", placeholder="게시글 제목을 입력하세요", key="new_post_title")
-                post_content = st.text_area("내용", placeholder="팀원 모집 내용을 작성하세요", height=100, key="new_post_content")
+                form_v = st.session_state.post_form_version
+                post_title = st.text_input("제목", placeholder="게시글 제목을 입력하세요", key=f"new_post_title_{form_v}")
+                post_content = st.text_area("내용", placeholder="팀원 모집 내용을 작성하세요", height=100, key=f"new_post_content_{form_v}")
                 
                 # 희망 인원 수 설정
                 st.markdown("#### 👥 희망 인원 설정")
-                num_members = st.number_input("희망 인원 수", min_value=1, max_value=10, value=1, key="num_members")
+                num_members = st.number_input("희망 인원 수", min_value=1, max_value=10, value=1, key=f"num_members_{form_v}")
                 
                 st.markdown("**각 인원별 희망 조건:**")
                 member_requirements = []
@@ -262,11 +273,11 @@ with tab1:
                     st.markdown(f"**{i+1}번 인원**")
                     mem_cols = st.columns(3)
                     with mem_cols[0]:
-                        mem_grade = st.selectbox(f"학년", ["무관"] + GRADES, key=f"mem_grade_{i}")
+                        mem_grade = st.selectbox(f"학년", ["무관"] + GRADES, key=f"mem_grade_{i}_{form_v}")
                     with mem_cols[1]:
-                        mem_college = st.selectbox(f"단과대", ["무관"] + list(COLLEGES.keys()), key=f"mem_college_{i}")
+                        mem_college = st.selectbox(f"단과대", ["무관"] + list(COLLEGES.keys()), key=f"mem_college_{i}_{form_v}")
                     with mem_cols[2]:
-                        mem_interest = st.selectbox(f"관심 분야", INTEREST_AREAS, key=f"mem_interest_{i}")
+                        mem_interest = st.selectbox(f"관심 분야", INTEREST_AREAS, key=f"mem_interest_{i}_{form_v}")
                     
                     member_requirements.append({
                         "번호": i + 1,
@@ -290,6 +301,8 @@ with tab1:
                         }
                         st.session_state.posts.insert(0, new_post)
                         st.session_state.post_expander_open = False
+                        # 폼 버전 증가로 입력값 초기화
+                        st.session_state.post_form_version += 1
                         st.success("게시글이 등록되었습니다!")
                         st.rerun()
                     else:
@@ -340,18 +353,25 @@ with tab1:
                     if not st.session_state.my_profile:
                         st.caption("댓글을 작성하려면 먼저 프로필을 등록해주세요.")
                     else:
-                        comment_key = f"comment_{post['id']}"
+                        post_id = post['id']
+                        if post_id not in st.session_state.comment_versions:
+                            st.session_state.comment_versions[post_id] = 0
+                        comment_v = st.session_state.comment_versions[post_id]
+                        comment_key = f"comment_{post_id}_{comment_v}"
+                        
                         comment_col1, comment_col2 = st.columns([4, 1])
                         with comment_col1:
                             new_comment = st.text_input("댓글 작성", key=comment_key, placeholder="참여 의사를 남겨주세요!", label_visibility="collapsed")
                         with comment_col2:
-                            if st.button("댓글 등록", key=f"btn_{post['id']}"):
+                            if st.button("댓글 등록", key=f"btn_{post_id}_{comment_v}"):
                                 if new_comment:
                                     post['댓글'].append({
                                         "작성자": st.session_state.my_profile["이름"],
                                         "작성자_정보": st.session_state.my_profile,
                                         "내용": new_comment
                                     })
+                                    # 댓글 버전 증가로 입력창 초기화
+                                    st.session_state.comment_versions[post_id] += 1
                                     st.rerun()
                     
                     st.markdown("---")
@@ -577,6 +597,9 @@ with tab3:
                         sender = st.session_state.my_profile["이름"] if st.session_state.my_profile else "나"
                         is_me = msg["발신자"] == sender
                         
+                        safe_content = html.escape(msg['내용'])
+                        safe_time = html.escape(msg['시간'])
+                        
                         if is_me:
                             st.markdown(f"""
                             <div style="
@@ -590,20 +613,22 @@ with tab3:
                                     border-radius: 15px;
                                     display: inline-block;
                                     max-width: 70%;
+                                    word-wrap: break-word;
                                 ">
-                                    {msg['내용']}
+                                    {safe_content}
                                 </span>
                                 <br>
-                                <span style="font-size: 11px; color: #888;">{msg['시간']}</span>
+                                <span style="font-size: 11px; color: #888;">{safe_time}</span>
                             </div>
                             """, unsafe_allow_html=True)
                         else:
+                            safe_sender = html.escape(msg['발신자'])
                             st.markdown(f"""
                             <div style="
                                 text-align: left;
                                 margin: 10px 0;
                             ">
-                                <strong>{msg['발신자']}</strong><br>
+                                <strong>{safe_sender}</strong><br>
                                 <span style="
                                     background-color: #e0e0e0;
                                     color: black;
@@ -611,11 +636,12 @@ with tab3:
                                     border-radius: 15px;
                                     display: inline-block;
                                     max-width: 70%;
+                                    word-wrap: break-word;
                                 ">
-                                    {msg['내용']}
+                                    {safe_content}
                                 </span>
                                 <br>
-                                <span style="font-size: 11px; color: #888;">{msg['시간']}</span>
+                                <span style="font-size: 11px; color: #888;">{safe_time}</span>
                             </div>
                             """, unsafe_allow_html=True)
                 
