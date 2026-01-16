@@ -189,6 +189,8 @@ if "show_post_success" not in st.session_state:
     st.session_state.show_post_success = False
 if "show_message_success" not in st.session_state:
     st.session_state.show_message_success = False
+if "selected_college" not in st.session_state:
+    st.session_state.selected_college = list(COLLEGES.keys())[0]
 
 # 헤더
 st.markdown("""
@@ -800,6 +802,29 @@ with tab4:
         st.markdown("---")
         st.markdown("#### 프로필 수정")
     
+    # 단과대 선택 (폼 외부 - 즉시 반영)
+    if st.session_state.my_profile:
+        default_college_idx = list(COLLEGES.keys()).index(st.session_state.my_profile["단과대"])
+        if st.session_state.selected_college != st.session_state.my_profile["단과대"]:
+            st.session_state.selected_college = st.session_state.my_profile["단과대"]
+    else:
+        default_college_idx = list(COLLEGES.keys()).index(st.session_state.selected_college)
+    
+    college = st.selectbox(
+        "단과대",
+        list(COLLEGES.keys()),
+        index=default_college_idx,
+        key="college_selector"
+    )
+    
+    # 단과대 변경 시 세션 상태 업데이트
+    if college != st.session_state.selected_college:
+        st.session_state.selected_college = college
+        st.rerun()
+    
+    # 선택된 단과대의 전공 목록
+    selected_college_majors = COLLEGES[st.session_state.selected_college]
+    
     # 프로필 폼
     with st.form("profile_form"):
         form_col1, form_col2 = st.columns(2)
@@ -815,18 +840,18 @@ with tab4:
                 GRADES,
                 index=GRADES.index(st.session_state.my_profile["학년"]) if st.session_state.my_profile else 0
             )
-            college = st.selectbox(
-                "단과대",
-                list(COLLEGES.keys()),
-                index=list(COLLEGES.keys()).index(st.session_state.my_profile["단과대"]) if st.session_state.my_profile else 0
-            )
+            st.caption(f"**선택된 단과대:** {st.session_state.selected_college}")
         
         with form_col2:
-            selected_college_majors = COLLEGES[college]
+            # 전공 선택 - 현재 단과대에 맞는 목록 표시
+            default_major_idx = 0
+            if st.session_state.my_profile and st.session_state.my_profile["전공"] in selected_college_majors:
+                default_major_idx = selected_college_majors.index(st.session_state.my_profile["전공"])
+            
             major = st.selectbox(
                 "전공",
                 selected_college_majors,
-                index=selected_college_majors.index(st.session_state.my_profile["전공"]) if st.session_state.my_profile and st.session_state.my_profile["전공"] in selected_college_majors else 0
+                index=default_major_idx
             )
             interests = st.multiselect(
                 "관심 분야",
@@ -856,7 +881,7 @@ with tab4:
                     "이름": name,
                     "학년": grade,
                     "학년_숫자": GRADES.index(grade) + 1,
-                    "단과대": college,
+                    "단과대": st.session_state.selected_college,
                     "전공": major,
                     "관심 분야": ", ".join(interests),
                     "관심 분야 리스트": interests,
