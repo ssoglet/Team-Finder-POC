@@ -822,10 +822,11 @@ with tab4:
             )
         
         with form_col2:
+            selected_college_majors = COLLEGES[college]
             major = st.selectbox(
                 "전공",
-                ALL_MAJORS,
-                index=ALL_MAJORS.index(st.session_state.my_profile["전공"]) if st.session_state.my_profile and st.session_state.my_profile["전공"] in ALL_MAJORS else 0
+                selected_college_majors,
+                index=selected_college_majors.index(st.session_state.my_profile["전공"]) if st.session_state.my_profile and st.session_state.my_profile["전공"] in selected_college_majors else 0
             )
             interests = st.multiselect(
                 "관심 분야",
