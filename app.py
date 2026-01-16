@@ -2,6 +2,7 @@ import streamlit as st
 import random
 import pandas as pd
 from datetime import datetime
+import altair as alt
 
 # 페이지 설정
 st.set_page_config(
@@ -23,9 +24,33 @@ COLLEGES = {
     "예술대학": ["시각디자인학과", "산업디자인학과", "미술학과", "음악학과"]
 }
 
+ALL_MAJORS = []
+for majors in COLLEGES.values():
+    ALL_MAJORS.extend(majors)
+
 INTEREST_AREAS = ["기획", "개발", "디자인", "데이터 분석", "마케팅", "영상제작", "글쓰기", "리서치"]
 ACTIVITIES = ["공모전", "대외활동", "창업", "스터디", "프로젝트"]
 GRADES = ["1학년", "2학년", "3학년", "4학년"]
+
+COLLEGE_COLORS = {
+    "공과대학": "#FF6B6B",
+    "경영대학": "#4ECDC4",
+    "사회과학대학": "#45B7D1",
+    "인문대학": "#96CEB4",
+    "자연과학대학": "#FFEAA7",
+    "예술대학": "#DDA0DD"
+}
+
+INTEREST_COLORS = {
+    "기획": "#FF6B6B",
+    "개발": "#4ECDC4",
+    "디자인": "#45B7D1",
+    "데이터 분석": "#96CEB4",
+    "마케팅": "#FFEAA7",
+    "영상제작": "#DDA0DD",
+    "글쓰기": "#98D8C8",
+    "리서치": "#F7DC6F"
+}
 
 def generate_dummy_data(count=25):
     """더미 학생 데이터 생성"""
@@ -58,17 +83,39 @@ def generate_dummy_data(count=25):
         })
     return students
 
-def filter_students(students, selected_interests, selected_colleges):
-    """조건에 맞는 학생 필터링"""
+def filter_students_advanced(students, filters, my_profile=None, apply_activity_filter=True):
+    """고급 필터링 - 학과, 학년, 관심분야, 희망활동"""
     filtered = []
     for student in students:
         if not student.get("활성화", True):
             continue
-        interest_match = not selected_interests or any(i in student["관심 분야 리스트"] for i in selected_interests)
-        college_match = not selected_colleges or student["단과대"] in selected_colleges
         
-        if interest_match and college_match:
-            filtered.append(student)
+        # 기본 필터: 내 희망 활동과 겹치는지 확인
+        if apply_activity_filter and my_profile:
+            my_activities = set(my_profile.get("희망 활동 리스트", []))
+            student_activities = set(student.get("희망 활동 리스트", []))
+            if not my_activities.intersection(student_activities):
+                continue
+        
+        # 전공 필터
+        if filters.get("majors") and student["전공"] not in filters["majors"]:
+            continue
+        
+        # 학년 필터
+        if filters.get("grades") and student["학년"] not in filters["grades"]:
+            continue
+        
+        # 관심 분야 필터
+        if filters.get("interests"):
+            if not any(i in student["관심 분야 리스트"] for i in filters["interests"]):
+                continue
+        
+        # 희망 활동 필터
+        if filters.get("activities"):
+            if not any(a in student["희망 활동 리스트"] for a in filters["activities"]):
+                continue
+        
+        filtered.append(student)
     return filtered
 
 @st.dialog("메시지 보내기")
@@ -126,6 +173,8 @@ if "my_profile" not in st.session_state:
     st.session_state.my_profile = None
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = None
+if "post_expander_open" not in st.session_state:
+    st.session_state.post_expander_open = False
 
 # 헤더
 st.markdown("""
@@ -144,6 +193,15 @@ with col_data1:
         st.session_state.chats = {}
         for i in range(3):
             student = random.choice(st.session_state.students)
+            member_requirements = []
+            num_members = random.randint(1, 3)
+            for j in range(num_members):
+                member_requirements.append({
+                    "번호": j + 1,
+                    "학년": random.choice(GRADES + ["무관"]),
+                    "단과대": random.choice(list(COLLEGES.keys()) + ["무관"]),
+                    "관심분야": random.choice(INTEREST_AREAS)
+                })
             st.session_state.posts.append({
                 "id": i,
                 "작성자": student["이름"],
@@ -154,9 +212,8 @@ with col_data1:
                     "아이디어가 있는데 같이 발전시켜 나갈 팀원 구합니다.",
                     "경험 유무 상관없이 열정만 있으면 됩니다!"
                 ]),
-                "희망_학년": random.sample(GRADES, k=random.randint(1, 4)),
-                "희망_단과대": random.sample(list(COLLEGES.keys()), k=random.randint(1, 3)),
-                "희망_관심분야": random.sample(INTEREST_AREAS, k=random.randint(1, 3)),
+                "희망_인원": num_members,
+                "인원별_조건": member_requirements,
                 "댓글": [],
                 "작성일": datetime.now().strftime("%Y-%m-%d %H:%M")
             })
@@ -187,21 +244,38 @@ with tab1:
         st.info("👆 먼저 '더미 데이터 생성' 버튼을 클릭해주세요!")
     else:
         # 새 게시글 작성
-        with st.expander("✍️ 새 게시글 작성하기", expanded=False):
+        with st.expander("✍️ 새 게시글 작성하기", expanded=st.session_state.post_expander_open):
             if not st.session_state.my_profile:
                 st.warning("게시글을 작성하려면 먼저 '본인 등록' 탭에서 프로필을 등록해주세요.")
             else:
-                post_title = st.text_input("제목", placeholder="게시글 제목을 입력하세요")
-                post_content = st.text_area("내용", placeholder="팀원 모집 내용을 작성하세요", height=100)
+                post_title = st.text_input("제목", placeholder="게시글 제목을 입력하세요", key="new_post_title")
+                post_content = st.text_area("내용", placeholder="팀원 모집 내용을 작성하세요", height=100, key="new_post_content")
                 
-                post_col1, post_col2 = st.columns(2)
-                with post_col1:
-                    post_grades = st.multiselect("희망 학년", GRADES, key="post_grades")
-                    post_colleges = st.multiselect("희망 단과대", list(COLLEGES.keys()), key="post_colleges")
-                with post_col2:
-                    post_interests = st.multiselect("희망 관심 분야", INTEREST_AREAS, key="post_interests")
+                # 희망 인원 수 설정
+                st.markdown("#### 👥 희망 인원 설정")
+                num_members = st.number_input("희망 인원 수", min_value=1, max_value=10, value=1, key="num_members")
                 
-                if st.button("📝 게시글 등록", type="primary"):
+                st.markdown("**각 인원별 희망 조건:**")
+                member_requirements = []
+                
+                for i in range(int(num_members)):
+                    st.markdown(f"**{i+1}번 인원**")
+                    mem_cols = st.columns(3)
+                    with mem_cols[0]:
+                        mem_grade = st.selectbox(f"학년", ["무관"] + GRADES, key=f"mem_grade_{i}")
+                    with mem_cols[1]:
+                        mem_college = st.selectbox(f"단과대", ["무관"] + list(COLLEGES.keys()), key=f"mem_college_{i}")
+                    with mem_cols[2]:
+                        mem_interest = st.selectbox(f"관심 분야", INTEREST_AREAS, key=f"mem_interest_{i}")
+                    
+                    member_requirements.append({
+                        "번호": i + 1,
+                        "학년": mem_grade,
+                        "단과대": mem_college,
+                        "관심분야": mem_interest
+                    })
+                
+                if st.button("📝 게시글 등록", type="primary", key="submit_post"):
                     if post_title and post_content:
                         new_post = {
                             "id": len(st.session_state.posts),
@@ -209,13 +283,13 @@ with tab1:
                             "작성자_정보": st.session_state.my_profile,
                             "제목": post_title,
                             "내용": post_content,
-                            "희망_학년": post_grades,
-                            "희망_단과대": post_colleges,
-                            "희망_관심분야": post_interests,
+                            "희망_인원": int(num_members),
+                            "인원별_조건": member_requirements,
                             "댓글": [],
                             "작성일": datetime.now().strftime("%Y-%m-%d %H:%M")
                         }
                         st.session_state.posts.insert(0, new_post)
+                        st.session_state.post_expander_open = False
                         st.success("게시글이 등록되었습니다!")
                         st.rerun()
                     else:
@@ -227,6 +301,12 @@ with tab1:
         if st.session_state.posts:
             for post in st.session_state.posts:
                 with st.container():
+                    # 인원별 조건 표시 문자열 생성
+                    member_info = ""
+                    if post.get("인원별_조건"):
+                        for req in post["인원별_조건"]:
+                            member_info += f"<br>• {req['번호']}번: {req['학년']} / {req['단과대']} / {req['관심분야']}"
+                    
                     st.markdown(f"""
                     <div style="
                         background-color: #f8f9fa;
@@ -240,10 +320,9 @@ with tab1:
                             <strong>작성자:</strong> {post['작성자']} ({post['작성자_정보']['단과대']} {post['작성자_정보']['전공']})
                         </p>
                         <p style="margin: 10px 0;">{post['내용']}</p>
-                        <p style="margin: 5px 0; font-size: 12px; color: #888;">
-                            희망 학년: {', '.join(post['희망_학년']) if post['희망_학년'] else '무관'} | 
-                            희망 단과대: {', '.join(post['희망_단과대']) if post['희망_단과대'] else '무관'} |
-                            희망 분야: {', '.join(post['희망_관심분야']) if post['희망_관심분야'] else '무관'}
+                        <p style="margin: 5px 0; font-size: 13px; color: #555;">
+                            <strong>👥 희망 인원:</strong> {post.get('희망_인원', 1)}명
+                            {member_info}
                         </p>
                         <p style="margin: 5px 0; font-size: 11px; color: #aaa;">작성일: {post['작성일']}</p>
                     </div>
@@ -253,22 +332,27 @@ with tab1:
                     if post['댓글']:
                         st.markdown("**💬 댓글:**")
                         for comment in post['댓글']:
-                            st.markdown(f"- **{comment['작성자']}**: {comment['내용']}")
+                            author_info = comment.get('작성자_정보', {})
+                            author_detail = f"({author_info.get('단과대', '')} {author_info.get('전공', '')})" if author_info else ""
+                            st.markdown(f"- **{comment['작성자']}** {author_detail}: {comment['내용']}")
                     
                     # 댓글 입력
-                    comment_key = f"comment_{post['id']}"
-                    comment_col1, comment_col2 = st.columns([4, 1])
-                    with comment_col1:
-                        new_comment = st.text_input("댓글 작성", key=comment_key, placeholder="참여 의사를 남겨주세요!", label_visibility="collapsed")
-                    with comment_col2:
-                        if st.button("댓글 등록", key=f"btn_{post['id']}"):
-                            if new_comment:
-                                author = st.session_state.my_profile["이름"] if st.session_state.my_profile else "익명"
-                                post['댓글'].append({
-                                    "작성자": author,
-                                    "내용": new_comment
-                                })
-                                st.rerun()
+                    if not st.session_state.my_profile:
+                        st.caption("댓글을 작성하려면 먼저 프로필을 등록해주세요.")
+                    else:
+                        comment_key = f"comment_{post['id']}"
+                        comment_col1, comment_col2 = st.columns([4, 1])
+                        with comment_col1:
+                            new_comment = st.text_input("댓글 작성", key=comment_key, placeholder="참여 의사를 남겨주세요!", label_visibility="collapsed")
+                        with comment_col2:
+                            if st.button("댓글 등록", key=f"btn_{post['id']}"):
+                                if new_comment:
+                                    post['댓글'].append({
+                                        "작성자": st.session_state.my_profile["이름"],
+                                        "작성자_정보": st.session_state.my_profile,
+                                        "내용": new_comment
+                                    })
+                                    st.rerun()
                     
                     st.markdown("---")
         else:
@@ -282,30 +366,71 @@ with tab2:
         st.info("👆 먼저 '더미 데이터 생성' 버튼을 클릭해주세요!")
     else:
         # 필터 조건 선택
-        filter_col1, filter_col2 = st.columns(2)
+        st.markdown("#### 🔧 필터 조건")
+        
+        filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
         
         with filter_col1:
-            selected_interests = st.multiselect(
-                "관심 분야 선택",
-                options=INTEREST_AREAS,
-                placeholder="원하는 관심 분야를 선택하세요",
-                key="search_interests"
+            selected_grades = st.multiselect(
+                "학년",
+                options=GRADES,
+                placeholder="학년 선택",
+                key="search_grades"
             )
         
         with filter_col2:
-            selected_colleges = st.multiselect(
-                "단과대 선택",
-                options=list(COLLEGES.keys()),
-                placeholder="원하는 단과대를 선택하세요",
-                key="search_colleges"
+            selected_majors = st.multiselect(
+                "전공",
+                options=ALL_MAJORS,
+                placeholder="전공 선택",
+                key="search_majors"
             )
+        
+        with filter_col3:
+            selected_interests = st.multiselect(
+                "관심 분야",
+                options=INTEREST_AREAS,
+                placeholder="관심 분야 선택",
+                key="search_interests"
+            )
+        
+        with filter_col4:
+            selected_activities = st.multiselect(
+                "희망 활동",
+                options=ACTIVITIES,
+                placeholder="희망 활동 선택",
+                key="search_activities"
+            )
+        
+        # 기본 필터 토글
+        apply_activity_filter = st.checkbox(
+            "내 희망 활동과 겹치는 사람만 표시",
+            value=True if st.session_state.my_profile else False,
+            disabled=not st.session_state.my_profile,
+            key="apply_activity_filter"
+        )
+        
+        if not st.session_state.my_profile and apply_activity_filter:
+            st.caption("⚠️ 기본 필터를 적용하려면 먼저 프로필을 등록해주세요.")
         
         st.markdown("---")
         
-        # 필터링된 학생
-        filtered_students = filter_students(st.session_state.students, selected_interests, selected_colleges)
+        # 필터 적용
+        filters = {
+            "grades": selected_grades,
+            "majors": selected_majors,
+            "interests": selected_interests,
+            "activities": selected_activities
+        }
         
-        # 통계 시각화
+        filtered_students = filter_students_advanced(
+            st.session_state.students, 
+            filters, 
+            st.session_state.my_profile,
+            apply_activity_filter and st.session_state.my_profile is not None
+        )
+        
+        # 통계 시각화 (색상 추가)
         stat_col1, stat_col2 = st.columns(2)
         
         with stat_col1:
@@ -320,7 +445,16 @@ with tab2:
                     "단과대": list(college_counts.keys()),
                     "인원수": list(college_counts.values())
                 })
-                st.bar_chart(df_college.set_index("단과대"))
+                
+                chart = alt.Chart(df_college).mark_bar().encode(
+                    x=alt.X("단과대:N", sort="-y", title="단과대"),
+                    y=alt.Y("인원수:Q", title="인원수"),
+                    color=alt.Color("단과대:N", scale=alt.Scale(
+                        domain=list(COLLEGE_COLORS.keys()),
+                        range=list(COLLEGE_COLORS.values())
+                    ), legend=None)
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
             else:
                 st.info("조건에 맞는 학생이 없습니다.")
         
@@ -333,10 +467,19 @@ with tab2:
             
             if interest_counts:
                 df_interest = pd.DataFrame({
-                    "관심 분야": list(interest_counts.keys()),
+                    "관심분야": list(interest_counts.keys()),
                     "인원수": list(interest_counts.values())
                 })
-                st.bar_chart(df_interest.set_index("관심 분야"))
+                
+                chart = alt.Chart(df_interest).mark_bar().encode(
+                    x=alt.X("관심분야:N", sort="-y", title="관심 분야"),
+                    y=alt.Y("인원수:Q", title="인원수"),
+                    color=alt.Color("관심분야:N", scale=alt.Scale(
+                        domain=list(INTEREST_COLORS.keys()),
+                        range=list(INTEREST_COLORS.values())
+                    ), legend=None)
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
             else:
                 st.info("조건에 맞는 학생이 없습니다.")
         
@@ -350,12 +493,15 @@ with tab2:
             for idx, student in enumerate(filtered_students):
                 with cols[idx % 3]:
                     with st.container():
+                        # 메시지 보내기 버튼을 카드 내부에 포함
+                        btn_key = f"msg_{student['id']}"
+                        
                         st.markdown(f"""
                         <div style="
                             background-color: #f8f9fa;
                             border-radius: 10px;
                             padding: 15px;
-                            margin-bottom: 10px;
+                            margin-bottom: 5px;
                             border-left: 4px solid #4CAF50;
                         ">
                             <h4 style="margin: 0 0 10px 0;">👤 {student['이름']}</h4>
@@ -366,11 +512,10 @@ with tab2:
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        # 메시지 보내기 버튼
-                        if st.button(f"💬 메시지 보내기", key=f"msg_{student['id']}", use_container_width=True):
+                        if st.button(f"💬 {student['이름']}님에게 메시지", key=btn_key, use_container_width=True):
                             send_message_dialog(student)
         else:
-            st.warning("조건에 맞는 팀원이 없습니다. 다른 조건을 선택해 보세요.")
+            st.warning("조건에 맞는 팀원이 없습니다. 필터를 조정해 보세요.")
         
         # 표 형태로도 표시
         st.markdown("---")
@@ -387,7 +532,7 @@ with tab2:
             st.dataframe(df_display, use_container_width=True, hide_index=True)
         else:
             st.info("표시할 데이터가 없습니다.")
-        
+
 # ===== 탭 3: 채팅 =====
 with tab3:
     st.markdown("### 💬 채팅")
@@ -401,10 +546,15 @@ with tab3:
             st.markdown("#### 채팅방 목록")
             for chat_id, chat_data in st.session_state.chats.items():
                 other_person = chat_data["상대방"]
-                last_msg = chat_data["메시지"][-1]["내용"][:20] + "..." if chat_data["메시지"] else "새 대화"
+                last_msg = chat_data["메시지"][-1]["내용"][:25] + "..." if len(chat_data["메시지"][-1]["내용"]) > 25 else chat_data["메시지"][-1]["내용"] if chat_data["메시지"] else "새 대화"
+                
+                # 채팅방 정보: 전공 / 학년 / 이름
+                chat_info = f"{other_person['전공']} / {other_person['학년']} / {other_person['이름']}"
+                
+                is_selected = st.session_state.current_chat == chat_id
                 
                 if st.button(
-                    f"👤 {other_person['이름']}\n{last_msg}",
+                    f"{'🔵 ' if is_selected else ''}{chat_info}\n📩 {last_msg}",
                     key=f"select_{chat_id}",
                     use_container_width=True
                 ):
@@ -417,7 +567,7 @@ with tab3:
                 other = current["상대방"]
                 
                 st.markdown(f"#### 💬 {other['이름']}님과의 대화")
-                st.markdown(f"*{other['단과대']} {other['전공']} | {other['학년']}*")
+                st.markdown(f"*{other['전공']} | {other['학년']} | {other['단과대']}*")
                 st.markdown("---")
                 
                 # 메시지 표시
