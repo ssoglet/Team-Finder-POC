@@ -259,6 +259,87 @@ with tab1:
         st.success("✅ 게시글이 등록되었습니다!")
         st.session_state.show_post_success = False
     
+    # ===== 공모전 정보 영역 =====
+    st.markdown("### 🏆 이번 달 주요 공모전")
+    
+    contest_col1, contest_col2 = st.columns(2)
+    
+    with contest_col1:
+        # 교내 공모전
+        st.markdown("""
+        <div style="
+            background-color: #e8f5e9;
+            border-radius: 10px;
+            padding: 15px;
+            border-left: 4px solid #4CAF50;
+            margin-bottom: 10px;
+        ">
+            <h5 style="margin: 0 0 10px 0;">🏫 교내 공모전</h5>
+            <p style="margin: 5px 0;">
+                <strong>AI Agent 해커톤</strong><br>
+                <a href="https://aibootcamp.hanyang.ac.kr/community/notice-detail.html?id=8" target="_blank" style="color: #1976D2;">
+                    🔗 자세히 보기
+                </a>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with contest_col2:
+        # 교외 공모전
+        st.markdown("""
+        <div style="
+            background-color: #e3f2fd;
+            border-radius: 10px;
+            padding: 15px;
+            border-left: 4px solid #2196F3;
+            margin-bottom: 10px;
+        ">
+            <h5 style="margin: 0 0 10px 0;">🌐 교외 공모전</h5>
+            <p style="margin: 5px 0;">
+                <strong>대학생 크립토 데모 트레이딩 대회</strong><br>
+                <a href="https://linkareer.com/activity/294993" target="_blank" style="color: #1976D2;">
+                    🔗 자세히 보기
+                </a>
+            </p>
+            <p style="margin: 5px 0;">
+                <strong>2026 서울국제정원박람회 학생동행정원 작품공모</strong><br>
+                <a href="https://linkareer.com/activity/294649" target="_blank" style="color: #1976D2;">
+                    🔗 자세히 보기
+                </a>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # 공모전 사이트 바로가기
+    with st.expander("📌 공모전 사이트 바로가기"):
+        site_cols = st.columns(3)
+        with site_cols[0]:
+            st.markdown("""
+            <a href="https://aibootcamp.hanyang.ac.kr/index.html" target="_blank" style="text-decoration: none;">
+                <div style="background-color: #fff3e0; padding: 10px; border-radius: 8px; text-align: center;">
+                    <strong>🎓 한양대학교 부트캠프사업단</strong>
+                </div>
+            </a>
+            """, unsafe_allow_html=True)
+        with site_cols[1]:
+            st.markdown("""
+            <a href="https://linkareer.com/list/contest?filterType=CATEGORY&orderBy_direction=DESC&orderBy_field=CREATED_AT&page=1" target="_blank" style="text-decoration: none;">
+                <div style="background-color: #fff3e0; padding: 10px; border-radius: 8px; text-align: center;">
+                    <strong>🔗 링커리어</strong>
+                </div>
+            </a>
+            """, unsafe_allow_html=True)
+        with site_cols[2]:
+            st.markdown("""
+            <a href="https://www.allforyoung.com/" target="_blank" style="text-decoration: none;">
+                <div style="background-color: #fff3e0; padding: 10px; border-radius: 8px; text-align: center;">
+                    <strong>✨ 요즘것들</strong>
+                </div>
+            </a>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
     if not st.session_state.students:
         st.info("👆 먼저 '더미 데이터 생성' 버튼을 클릭해주세요!")
     else:
