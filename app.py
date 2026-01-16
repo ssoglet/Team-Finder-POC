@@ -316,7 +316,7 @@ with tab1:
         with site_cols[0]:
             st.markdown("""
             <a href="https://aibootcamp.hanyang.ac.kr/index.html" target="_blank" style="text-decoration: none;">
-                <div style="background-color: #fff3e0; padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="background-color: #fff3e0; padding: 12px; border-radius: 8px; text-align: center; margin: 5px 0;">
                     <strong>🎓 한양대학교 부트캠프사업단</strong>
                 </div>
             </a>
@@ -324,7 +324,7 @@ with tab1:
         with site_cols[1]:
             st.markdown("""
             <a href="https://linkareer.com/list/contest?filterType=CATEGORY&orderBy_direction=DESC&orderBy_field=CREATED_AT&page=1" target="_blank" style="text-decoration: none;">
-                <div style="background-color: #fff3e0; padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="background-color: #fff3e0; padding: 12px; border-radius: 8px; text-align: center; margin: 5px 0;">
                     <strong>🔗 링커리어</strong>
                 </div>
             </a>
@@ -332,7 +332,7 @@ with tab1:
         with site_cols[2]:
             st.markdown("""
             <a href="https://www.allforyoung.com/" target="_blank" style="text-decoration: none;">
-                <div style="background-color: #fff3e0; padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="background-color: #fff3e0; padding: 12px; border-radius: 8px; text-align: center; margin: 5px 0;">
                     <strong>✨ 요즘것들</strong>
                 </div>
             </a>
