@@ -1,7 +1,7 @@
 import streamlit as st
 import random
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import altair as alt
 import html
 
@@ -156,7 +156,7 @@ def send_message_dialog(target):
                 st.session_state.chats[chat_id]["메시지"].append({
                     "발신자": sender,
                     "내용": message_content,
-                    "시간": datetime.now().strftime("%H:%M")
+                    "시간": (datetime.now() + timedelta(hours=9)).strftime("%H:%M")
                 })
                 
                 st.session_state.show_message_success = True
@@ -684,7 +684,7 @@ with tab3:
                             current["메시지"].append({
                                 "발신자": sender,
                                 "내용": new_message,
-                                "시간": datetime.now().strftime("%H:%M")
+                                "시간": (datetime.now() + timedelta(hours=9)).strftime("%H:%M")
                             })
                             st.rerun()
             else:
